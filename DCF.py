@@ -2,16 +2,36 @@ import streamlit as st
 import pandas as pd
 
 # — Guide / Instructions —
-st.sidebar.header("📘 How to use")
+st.sidebar.header("📘 How to use & DCF Best Practices")
 st.sidebar.markdown("""
-1. **Metric to use** – Choose between **EPS** (Earnings Per Share) or **FCF per share** (Free Cash Flow per share).
-2. **Current Metric** – Enter today’s EPS or FCF/share value.
-3. **CAGR (%)** – Expected annual growth rate for that metric, over your chosen horizon.
-4. **Discount Rate (%)** – Annual rate used to discount future value back to the present.
-5. **Horizon (years)** – Number of years to project growth.
-6. **Current Share Price** – The stock’s market price today, for upside calculation.
-7. **Average P/E Multiples** – Comma-separated list of P/E ratios (e.g., historical averages) you want to test.
-8. Click **Calculate** – See implied per-share values at each multiple, plus % upside vs. today’s price.
+**1. Metric to use**  
+• Choose between **EPS** (Earnings Per Share) or **FCF per share** (Free Cash Flow per share).
+
+**2. Current Metric**  
+• Enter today’s TTM (trailing twelve months) EPS or FCF per share rather than a single quarterly value for stability.
+
+**3. CAGR (%)**  
+• Expected annual growth rate for your chosen metric over the projection horizon.  
+• Base this on historical performance, analyst forecasts, or industry outlook.
+
+**4. Discount Rate (%)**  
+• Use your company’s WACC or a risk-adjusted rate to discount future cash flows.
+
+**5. Horizon (years)**  
+• 5 years is common, but longer horizons (7–10 years) can capture mature cash flows for stable businesses.
+
+**6. Current Share Price**  
+• The stock’s market price today, used to calculate implied upside scenarios.
+
+**7. Average P/E Multiples**  
+• Use historical average P/E or peer multiples. Test a range to see sensitivity.
+
+**DCF Best Practices**  
+- **Use TTM figures**: smooths out seasonality and one-offs.  
+- **Conservatism**: err on the side of cautious growth and higher discount rates.  
+- **Sensitivity Analysis**: vary growth, discount rate, and multiples to understand valuation drivers.  
+- **Terminal Value**: if extending beyond your horizon, model a conservative long-term growth rate.  
+- **Reconcile with comparables**: cross-check implied values against peer valuations.
 """)
 
 st.title("Intrinsic Value Calculator")
@@ -23,10 +43,10 @@ metric = st.selectbox(
     help="Choose which per-share figure you want to project and value."
 )
 metric_value = st.number_input(
-    f"Current {metric}",
+    f"Current {metric} (TTM)",
     value=2.50,
     format="%.2f",
-    help=f"Enter the current {metric} per share."
+    help=f"Enter the trailing-12-month {metric} per share."
 )
 
 # — Growth & discount inputs —
@@ -60,7 +80,7 @@ share_price = st.number_input(
 mult_str = st.text_input(
     "Average P/E Multiples (comma-separated)",
     value="5,10,15,20,25,30,35,40,45,50",
-    help="List the P/E ratios (e.g., historical averages) you want to test, separated by commas."
+    help="List the P/E ratios (e.g., historical averages or peer multiples) you want to test, separated by commas."
 )
 
 if st.button("Calculate"):
@@ -96,4 +116,3 @@ if st.button("Calculate"):
 
     except Exception as e:
         st.error(f"Input error: {e}")
-
