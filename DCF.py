@@ -37,18 +37,28 @@ st.sidebar.markdown("""
 st.title("Intrinsic + Terminal Value Calculator")
 
 # — Core inputs —
-metric = st.selectbox("Metric to use", ["EPS", "FCF per share"])
+metric       = st.selectbox("Metric to use", ["EPS", "FCF per share"])
 metric_value = st.number_input(f"Current {metric} (TTM)", value=2.50, format="%.2f")
-cagr_pct = st.number_input("CAGR (%)", value=5.00, format="%.2f")
-dr_pct   = st.number_input("Discount Rate (%)", value=10.00, format="%.2f")
-years    = st.number_input("Horizon (years)", value=5, min_value=1, step=1)
-share_price = st.number_input("Current Share Price", value=72.00, format="%.2f")
-mult_str  = st.text_input("Average P/E Multiples (comma-separated)", value="5,10,15,20,25,30,35,40,45,50")
+cagr_pct     = st.number_input("CAGR (%)", value=5.00, format="%.2f")
+dr_pct       = st.number_input("Discount Rate (%)", value=10.00, format="%.2f")
+years        = st.number_input("Explicit Forecast (years)", value=5, min_value=1, step=1)
+share_price  = st.number_input("Current Share Price", value=72.00, format="%.2f")
+mult_str     = st.text_input(
+    "Average P/E Multiples (comma-separated)",
+    value="5,10,15,20,25,30,35,40,45,50"
+)
 
 # — Terminal Value toggle + inputs —
 st.markdown("### Terminal Value Settings")
-include_tv = st.checkbox("Include Terminal Value?")
+include_tv      = st.checkbox("Include Terminal Value?")
 if include_tv:
+    term_year_pct = st.number_input(
+        "Terminal Year (yrs)",
+        value=years,
+        min_value=years,
+        step=1,
+        help="Year at which the terminal perpetuity begins (must be ≥ explicit forecast years)."
+    )
     term_growth_pct = st.number_input(
         "Terminal Growth Rate (%)",
         value=2.00,
@@ -63,7 +73,7 @@ if st.button("Calculate"):
         dr        = dr_pct    / 100
         multiples = [int(m.strip()) for m in mult_str.split(",") if m.strip()]
 
-        # project metric
+        # project to explicit horizon
         future_metric = metric_value * (1 + cagr) ** years
         pv_metric     = future_metric / (1 + dr) ** years
 
@@ -73,12 +83,18 @@ if st.button("Calculate"):
             if g >= dr:
                 st.error("⚠️ Terminal growth must be less than discount rate.")
                 st.stop()
+
+            # terminal year
+            ty = term_year_pct
+            # compute terminal value at horizon, then discount from term year
             tv    = future_metric * (1 + g) / (dr - g)
-            pv_tv = tv / (1 + dr) ** years
+            pv_tv = tv / (1 + dr) ** ty
+
+            st.write(f"**PV of explicit forecast ({years} yrs):** ${pv_metric:,.2f}")
+            st.write(f"**PV of Terminal Value (@ yr {ty}):**   ${pv_tv:,.2f}")
             pv_total = pv_metric + pv_tv
-            st.write(f"**PV of projected {metric}:** ${pv_metric:,.2f}")
-            st.write(f"**PV of Terminal Value:**   ${pv_tv:,.2f}")
-            st.write(f"**Combined PV Factor:**     ${pv_total:,.2f}")
+            st.write(f"**Combined PV Factor:**              ${pv_total:,.2f}")
+
             pv_factor = pv_total
         else:
             pv_factor = pv_metric
