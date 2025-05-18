@@ -7,34 +7,36 @@ st.sidebar.markdown("""
 **1. Metric to use**  
 • Choose between **EPS** (Earnings Per Share) or **FCF per share** (Free Cash Flow per share).
 
-**2. Current Metric**  
-• Enter today’s TTM (trailing twelve months) EPS or FCF per share rather than a single quarterly value for stability.
+**2. Current Metric (TTM)**  
+• Enter the trailing-12-month EPS or FCF per share for a stable baseline.
 
 **3. CAGR (%)**  
-• Expected annual growth rate for your chosen metric over the projection horizon.  
-• Base this on historical performance, analyst forecasts, or industry outlook.
+• Expected annual growth rate for your chosen metric over the projection horizon.
 
 **4. Discount Rate (%)**  
-• Use your company’s WACC or a risk-adjusted rate to discount future cash flows.
+• Use your WACC or a risk-adjusted rate to discount future cash flows.
 
 **5. Horizon (years)**  
-• 5 years is common, but longer horizons (7–10 years) can capture mature cash flows for stable businesses.
+• Typical range is 5–10 years; adjust based on business maturity.
 
 **6. Current Share Price**  
-• The stock’s market price today, used to calculate implied upside scenarios.
+• Today’s market price, used to calculate implied upside.
 
 **7. Average P/E Multiples**  
-• Use historical average P/E or peer multiples. Test a range to see sensitivity.
+• Historical or peer-group average P/Es, comma-separated.
+
+**8. Terminal Value (optional)**  
+• Toggle on to include a perpetuity value at horizon:  
+  – **Terminal Growth Rate**: long-term growth < discount rate.  
+  – Uses **TV = (Metricₙ × (1 + g)) / (r – g)**, discounted back as a lump sum.
 
 **DCF Best Practices**  
-- **Use TTM figures**: smooths out seasonality and one-offs.  
-- **Conservatism**: err on the side of cautious growth and higher discount rates.  
-- **Sensitivity Analysis**: vary growth, discount rate, and multiples to understand valuation drivers.  
-- **Terminal Value**: if extending beyond your horizon, model a conservative long-term growth rate.  
-- **Reconcile with comparables**: cross-check implied values against peer valuations.
+- Use TTM figures to smooth seasonality.  
+- Run sensitivity on growth, discount, and multiples.  
+- Cross-check implied values against peers.  
 """)
 
-st.title("Intrinsic Value Calculator")
+st.title("Intrinsic Value + Terminal Value Calculator")
 
 # — Metric selection and input —
 metric = st.selectbox(
@@ -54,54 +56,85 @@ cagr_pct = st.number_input(
     "CAGR (%)",
     value=5.00,
     format="%.2f",
-    help="Expected annual growth rate (in percent) for your projection horizon."
+    help="Expected annual growth rate for your projection horizon."
 )
 dr_pct = st.number_input(
     "Discount Rate (%)",
     value=10.00,
     format="%.2f",
-    help="Annual rate used to discount future value back to today."
+    help="Annual rate to discount future value back to present."
 )
 years = st.number_input(
     "Horizon (years)",
     value=5,
     min_value=1,
     step=1,
-    help="Number of years over which to project growth."
+    help="Years to project growth."
 )
+
+# — Terminal value toggle & input —
+include_tv = st.checkbox(
+    "Include Terminal Value?",
+    value=False,
+    help="Toggle to add a perpetuity value at the end of your horizon."
+)
+if include_tv:
+    term_growth_pct = st.number_input(
+        "Terminal Growth Rate (%)",
+        value=2.00,
+        format="%.2f",
+        help="Long-term perpetual growth rate (must be < discount rate)."
+    )
 
 # — Price and multiples —
 share_price = st.number_input(
     "Current Share Price",
     value=72.00,
     format="%.2f",
-    help="Stock’s current market price per share, for calculating upside."
+    help="Today’s market price per share."
 )
 mult_str = st.text_input(
     "Average P/E Multiples (comma-separated)",
     value="5,10,15,20,25,30,35,40,45,50",
-    help="List the P/E ratios (e.g., historical averages or peer multiples) you want to test, separated by commas."
+    help="Historical or peer P/E ratios to test."
 )
 
 if st.button("Calculate"):
     try:
         # parse inputs
-        cagr = cagr_pct / 100
-        dr   = dr_pct   / 100
+        cagr      = cagr_pct / 100
+        dr        = dr_pct   / 100
         multiples = [int(m.strip()) for m in mult_str.split(",") if m.strip()]
 
-        # project & discount
-        fv = metric_value * (1 + cagr) ** years
-        pv = fv / (1 + dr) ** years
+        # project metric to horizon and discount
+        future_metric = metric_value * (1 + cagr) ** years
+        pv_metric     = future_metric / (1 + dr) ** years
 
-        # build results
+        # compute terminal value if requested
+        if include_tv:
+            g = term_growth_pct / 100
+            if g >= dr:
+                st.error("Terminal growth must be less than discount rate.")
+                st.stop()
+            tv     = future_metric * (1 + g) / (dr - g)
+            pv_tv  = tv / (1 + dr) ** years
+            pv_base = pv_metric
+            pv_total = pv_base + pv_tv
+            st.write(f"**PV of Horizon Metric**: ${pv_base:,.2f}  ")
+            st.write(f"**PV of Terminal Value**: ${pv_tv:,.2f}  ")
+            st.write(f"**Combined PV Factor**:  ${pv_total:,.2f}  ")
+            pv_factor = pv_total
+        else:
+            pv_factor = pv_metric
+
+        # build results table
         data = {
             "P/E Multiple":      [],
             f"Value per Share ({metric})": [],
             "Upside (%)":        []
         }
         for m in multiples:
-            implied = pv * m
+            implied = pv_factor * m
             upside  = (implied / share_price - 1) * 100
             data["P/E Multiple"].append(m)
             data[f"Value per Share ({metric})"].append(implied)
